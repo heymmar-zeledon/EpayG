@@ -1,13 +1,13 @@
 <?php
 //Creamos nuestra propia clase de pasarela heredando de WC_Payment_Gateway
-class WC_EpayG_Payment_Gateway extends WC_Payment_Gateway
+class EpayG extends WC_Payment_Gateway
 {
   function __construct() {
     //ID global para nuestro metodo de pago
     $this->id = "EpayG_payment";
 
     // Titulo que se mostrara en la parte superior de la pagina de pasarelas de pago
-    $this->method_title = __( "EPAYG PAYMENT GATEWAY", 'EpayG_payment' );
+    $this->method_title = __( "EpayG", 'EpayG_payment' );
 
     // Descripcion de la pasarela de pago mostrada en la pagina de opciones de pago real
     $this->method_description = __( "EPAYG Payment Gateway Plug-in for WooCommerce", 'EpayG_payment' );
@@ -30,10 +30,7 @@ class WC_EpayG_Payment_Gateway extends WC_Payment_Gateway
     //obtenemos la configuracion y podemos cargarlas en variables
     $this->init_settings();
 
-    //convertimos las variables para poder usarlas
-    foreach ( $this->settings as $setting_key => $value ) {
-       $this->$setting_key = $value;
-    }
+    add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
 
       //chequeamos el SSL
     add_action( 'admin_notices', array( $this,  'do_ssl_check' ) );
@@ -68,9 +65,5 @@ class WC_EpayG_Payment_Gateway extends WC_Payment_Gateway
       ),
     );
   }
-
-
-
-
-
+}
 ?>
