@@ -1,7 +1,7 @@
 <?php
 //Añadimos nuestra propia clase extendiendo de WC_Payment_Gateway
 class EpayG_Payment_Gateway extends WC_Payment_Gateway {
-  
+
   // Configuracion del id, descripcion y otros valores de la pasarela de pago
   function __construct() {
     //ID global de nuestra pasarela de pago
@@ -17,7 +17,7 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
     $this->title = __( "EpayG", 'epayg_payment' );
 
     //Icono de nuestra pasarela
-    $this->icon = apply_filters( 'woocommerce_gateway_icon', $plugin_dir.'\images\pasarela-de-pago.png' );
+    $this->icon = apply_filters( 'woocommerce_gateway_icon', plugins_url('\images\icon.png', __FILE__) );
 
     //integramos los campos de pago
     $this->has_fields = true;
@@ -43,7 +43,7 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
     if ( is_admin() ) {
       add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
     }
-  } // End __construct()
+  } // Fin del constructor
 
 
   // Construimos los campos de administracion del plugin para el administrador
@@ -61,7 +61,7 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
         'title'   => __( 'Título', 'epayg_payment' ),
         'type'    => 'text',
         'desc_tip'  => __( 'Título de pago que el cliente verá durante el proceso de pago.', 'epayg_payment' ),
-        'default' => __( 'Tarjeta de credito', 'epayg_payment' ),
+        'default' => __( '', 'epayg_payment' ),
       ),
       'description' => array(
         //breve descripcion
@@ -87,7 +87,106 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
       ),
     );
   }
-  
-  
+
+  //Empezamos el proceso de pago
+  public function process_payment( $order_id ) {
+    global $woocommerce;
+
+    //obtenemos la informacion de esta orden para saber a quien y cuanto se va a cobrar
+    $customer_order = new WC_Order( $order_id );
+
+    $url = 'https://EpayG/payment_Gateway.com/';
+
+    $time = time();
+
+    $key_id = $this->key_id;
+
+
+    $orderid = str_replace( "#", "", $customer_order->get_order_number() );
+
+    $hash = md5($orderid."|".$customer_order->order_total."|".$time."|".$this->api_key);
+
+    // Preparamos la informacion a enviar
+    $payload = array(
+      "key_id"  => $key_id,
+      "hash" => $hash,
+      "time" => $time,
+      "amount" => $customer_order->order_total,
+      "ccnumber" => str_replace( array(' ', '-' ), '', $_POST['bac_payment-card-number'] ),
+      "ccexp" => str_replace( array( '/', ' '), '', $_POST['bac_payment-card-expiry'] ),
+      "orderid" => $orderid,
+      "cvv" => ( isset( $_POST['bac_payment-card-cvc'] ) ) ? $_POST['bac_payment-card-cvc'] : '',
+      "type" => "auth",
+     );
+
+    // Enviamos esta autorizacion para el procesamiento
+    $response = wp_remote_post( $url, array(
+      'method'    => 'POST',
+      'body'      => http_build_query( $payload ),
+      'timeout'   => 90,
+      'sslverify' => false,
+    ) );
+
+    if ( is_wp_error( $response ) )
+      throw new Exception( __( 'Ups! Tenemos un pequeño inconveniente con este pago, sentimos las molestias.', 'epayg_payment' ) );
+
+    if ( empty( $response['body'] ) )
+      throw new Exception( __( 'La respuesta esta vacia.', 'bac-payment' ) );
+
+    // Si no se encontro ningun error recuperamos la respuesta
+    $response_body = wp_remote_retrieve_body( $response );
+
+    // Analizamos la respuesta para poder leerla
+    $resp_e = explode( "&", $response_body ); //Convertimos el cuerpo de la respuesta en strings quitando el delimitador &
+    $resp = array();
+    foreach($resp_e as $r) {
+      $v = explode('=', $r);//separamos los string de cada iteracion del delimitador =
+      $resp[$v[0]] = $v[1];//Almacenamos los datos separados en el arreglo resp
+    }
+
+    //Evaluamos la respuesta del codigo enviado para verificar si fue exitoso o no
+    if ( ($resp['response'] == 1 ) || ( $resp['response_code'] == 200 ) ) {
+      // El pago se completo con exito
+      $customer_order->add_order_note( __( 'Pago completado con exito.', 'epayg_payment' ) );
+
+      // Guardando la informacion
+      $order_id = method_exists( $customer_order, 'get_id' ) ? $customer_order->get_id() : $customer_order->ID;
+      update_post_meta($order_id , '_wc_order_authcode', $resp['authcode'] );
+			update_post_meta($order_id , '_wc_order_transactionid', $resp['transactionid'] );
+
+      // Marcamos el pedido como pagado
+      $customer_order->payment_complete();
+
+      // Vaciamos el carrito
+      $woocommerce->cart->empty_cart();
+
+      // Redirigimos a la pagina de agradecimiento
+      return array(
+        'result'   => 'success',
+        'redirect' => $this->get_return_url( $customer_order ),
+      );
+    } else {
+      // Si la transaccion no fue exitosa agregamos una notificacion al carrito
+      wc_add_notice( $resp['responsetext'], 'error' );
+      // agregamos una nota al pedido referenciado
+      $customer_order->add_order_note( 'Error: '. $resp['responsetext'] );
+    }
+
+  }//fin del proceso de pago
+
+  //funcion para validar los campos
+  public function validate_fields() {
+    return true; //retornamos verdadero para activar la validacion
+  }
+
 }
+
+//Mostramos el valor del campo en la página de edición del pedido
+add_action( 'woocommerce_admin_order_data_after_billing_address', 'show_info', 10, 1 );
+function show_info( $order ){
+    $order_id = method_exists( $order, 'get_id' ) ? $order->get_id() : $order->id;
+    echo '<p><strong>'.__('Auth Code').':</strong> ' . get_post_meta( $order_id, '_wc_order_authcode', true ) . '</p>';
+    echo '<p><strong>'.__('Transaction Id').':</strong> ' . get_post_meta( $order_id, '_wc_order_transactionid', true ) . '</p>';
+}
+
 ?>

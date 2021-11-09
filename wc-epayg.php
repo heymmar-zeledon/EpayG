@@ -3,8 +3,8 @@
 Plugin name: EpayG
 Plugin URI: https://github.com/heymmar-zeledon/EpayG
 Description: Extension de WooCommerce añadiendo una pasarela de pago
-Version: 1
-Author: Heymmar_Zeledon
+Version: 2.0
+Author: Heymmar_Zeledon & Fernando Cordoba
 Author URI: https://github.com/heymmar-zeledon
 */
 
