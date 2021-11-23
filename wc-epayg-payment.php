@@ -5,16 +5,16 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
   // Configuracion del id, descripcion y otros valores de la pasarela de pago
   function __construct() {
     //ID global de nuestra pasarela de pago
-    $this->id = "epayg_payment";
+    $this->id = "epayg_payment_gateway";
 
     //Titulo de la pasarela que aparecera con las demas pasarelas de pago activas
-    $this->method_title = __( "EpayG", 'epayg_payment' );
+    $this->method_title = __( "EpayG", 'epayg-payment-gateway' );
 
     //Breve descripcion de nuestra pasarela de pago
-    $this->method_description = __( "Metodo de pago rapido atravez de tarjeta de credito o debito", 'epayg_payment' );
+    $this->method_description = __( "Metodo de pago rapido atravez de tarjeta de credito o debito", 'epayg-payment-gateway' );
 
     //Titulo que usaremos dentro de las configuraciones de nuestra pasarela
-    $this->title = __( "EpayG", 'epayg_payment' );
+    $this->title = __( "EpayG", 'epayg-payment-gateway' );
 
     //Icono de nuestra pasarela
     $this->icon = apply_filters( 'woocommerce_gateway_icon', plugins_url('\images\icon.png', __FILE__) );
@@ -51,26 +51,46 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
     $this->form_fields = array(
       'enabled' => array(
         //funcion de activar o desactivar el plugin
-        'title'   => __( 'Activar / Desactivar', 'epayg_payment' ),
-        'label'   => __( 'Activar este metodo de pago', 'epayg_payment' ),
+        'title'   => __( 'Activar / Desactivar', 'epayg-payment-gateway' ),
+        'label'   => __( 'Activar este metodo de pago', 'epayg-payment-gateway' ),
         'type'    => 'checkbox',
         'default' => 'no',
       ),
       'title' => array(
         //titulo para el proceso de pago
-        'title'   => __( 'Título', 'epayg_payment' ),
+        'title'   => __( 'Título', 'epayg-payment-gateway' ),
         'type'    => 'text',
-        'desc_tip'  => __( 'Título de pago que el cliente verá durante el proceso de pago.', 'epayg_payment' ),
-        'default' => __( '', 'epayg_payment' ),
+        'desc_tip'  => __( 'Título de pago que el cliente verá durante el proceso de pago.', 'epayg-payment-gateway' ),
+        'default' => __( 'EpayG', 'epayg-payment-gateway' ),
       ),
       'description' => array(
         //breve descripcion
-        'title'   => __( 'Descripción', 'epayg_payment' ),
+        'title'   => __( 'Descripción', 'epayg-payment-gateway' ),
         'type'    => 'textarea',
-        'desc_tip'  => __( 'Descripción de pago que el cliente verá durante el proceso de pago.', 'epayg_payment' ),
-        'default' => __( 'Pague con seguridad usando su tarjeta de crédito.', 'epayg_payment' ),
+        'desc_tip'  => __( 'Descripción de pago que el cliente verá durante el proceso de pago.', 'epayg-payment-gateway' ),
+        'default' => __( 'Pague con seguridad usando su tarjeta de crédito.', 'epayg-payment-gateway' ),
         'css'   => 'max-width:350px;'
       ),
+      // INIT------> Prueba de authorize.net <------
+      'api_login' => array(
+        'title'    => __( 'API Login', 'epayg-payment-gateway' ),
+        'type'    => 'text',
+        'desc_tip'  => __( 'Esta llave la provee Authorize.net al registrarse', 'epayg-payment-gateway' ),
+      ),
+      'trans_key' => array(
+        'title'    => __( 'Llave de transaccion', 'epayg-payment-gateway' ),
+        'type'    => 'password',
+        'desc_tip'  => __( 'Esta llave la provee Authorize.net al registrarse', 'epayg-payment-gateway' ),
+      ),
+      'environment' => array(
+        'title'    => __( 'Modo de prueba por authorize.net', 'epayg-payment-gateway' ),
+        'label'    => __( 'Habilitar el modo de prueba', 'epayg-payment-gateway' ),
+        'type'    => 'checkbox',
+        'description' => __( 'Utiliza este modo para testear el plugin de pago EpayG con Authorize.net', 'epayg-payment-gateway' ),
+        'default'  => 'no',
+      ),
+      // END-------> Prueba de authorize.net <------
+      /*
       //key id para el hash de pago
       'key_id' => array(
         'title'   => __( 'Key id', 'epayg_payment' ),
@@ -85,6 +105,7 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
         'desc_tip'  => __( 'ID de clave de api del panel de control del comerciante.', 'epayg_payment' ),
         'default' => '',
       ),
+      */
     );
   }
 
@@ -95,13 +116,75 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
     //obtenemos la informacion de esta orden para saber a quien y cuanto se va a cobrar
     $customer_order = new WC_Order( $order_id );
 
-    $url = 'https://EpayG/payment_Gateway.com/';
+    // INIT------> Prueba de authorize.net <------
+    // chequeamos la trancision
+    $environment = ( $this->environment == "yes" ) ? 'TRUE' : 'FALSE';
+    // Decidimos en que URL vamos a publicar
+    $environment_url = ( "FALSE" == $environment )
+                           ? 'https://secure.authorize.net/gateway/transact.dll'
+           : 'https://test.authorize.net/gateway/transact.dll';
+    // END------> Prueba de authorize.net <------
 
-    $time = time();
+    //URl de la API propia
+    //$environment_url = 'https://EpayG/payment_Gateway.com/';
 
-    $key_id = $this->key_id;
+    //$time = time();
 
+    //$key_id = $this->key_id;
 
+    // INIT------> Prueba de authorize.net <------
+    $payload = array(
+     // Credenciales de la API
+     "x_tran_key"             => $this->trans_key,
+     "x_login"                => $this->api_login,
+     "x_version"              => "3.1",
+
+     // Orden total
+     "x_amount"               => $customer_order->order_total,
+
+     // Informacion de la tarjeta de credito
+     "x_card_num"             => str_replace( array(' ', '-' ), '', $_POST['epayg_payment_gateway-card-number'] ),
+     "x_card_code"            => ( isset( $_POST['epayg_payment_gateway-card-cvc'] ) ) ? $_POST['epayg_payment_gateway-card-cvc'] : '',
+     "x_exp_date"             => str_replace( array( '/', ' '), '', $_POST['epayg_payment_gateway-card-expiry'] ),
+
+     "x_type"                 => 'AUTH_CAPTURE',
+     "x_invoice_num"          => str_replace( "#", "", $customer_order->get_order_number() ),
+     "x_test_request"         => $environment,
+     "x_delim_char"           => '|',
+     "x_encap_char"           => '',
+     "x_delim_data"           => "TRUE",
+     "x_relay_response"       => "FALSE",
+     "x_method"               => "CC",
+
+     // Billing Information
+     "x_first_name"           => $customer_order->billing_first_name,
+     "x_last_name"            => $customer_order->billing_last_name,
+     "x_address"              => $customer_order->billing_address_1,
+     "x_city"                => $customer_order->billing_city,
+     "x_state"                => $customer_order->billing_state,
+     "x_zip"                  => $customer_order->billing_postcode,
+     "x_country"              => $customer_order->billing_country,
+     "x_phone"                => $customer_order->billing_phone,
+     "x_email"                => $customer_order->billing_email,
+
+     // Shipping Information
+     "x_ship_to_first_name"   => $customer_order->shipping_first_name,
+     "x_ship_to_last_name"    => $customer_order->shipping_last_name,
+     "x_ship_to_company"      => $customer_order->shipping_company,
+     "x_ship_to_address"      => $customer_order->shipping_address_1,
+     "x_ship_to_city"         => $customer_order->shipping_city,
+     "x_ship_to_country"      => $customer_order->shipping_country,
+     "x_ship_to_state"        => $customer_order->shipping_state,
+     "x_ship_to_zip"          => $customer_order->shipping_postcode,
+
+     // information customer
+     "x_cust_id"              => $customer_order->user_id,
+     "x_customer_ip"          => $_SERVER['REMOTE_ADDR'],
+
+   );
+     // END------> Prueba de authorize.net <------
+
+    /*
     $orderid = str_replace( "#", "", $customer_order->get_order_number() );
 
     $hash = md5($orderid."|".$customer_order->order_total."|".$time."|".$this->api_key);
@@ -118,9 +201,10 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
       "cvv" => ( isset( $_POST['bac_payment-card-cvc'] ) ) ? $_POST['bac_payment-card-cvc'] : '',
       "type" => "auth",
      );
+     */
 
     // Enviamos esta autorizacion para el procesamiento
-    $response = wp_remote_post( $url, array(
+    $response = wp_remote_post( $environment_url, array(
       'method'    => 'POST',
       'body'      => http_build_query( $payload ),
       'timeout'   => 90,
@@ -128,31 +212,36 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
     ) );
 
     if ( is_wp_error( $response ) )
-      throw new Exception( __( 'Ups! Tenemos un pequeño inconveniente con este pago, sentimos las molestias.', 'epayg_payment' ) );
+      throw new Exception( __( 'Ups! Tenemos un pequeño inconveniente con este pago, sentimos las molestias.', 'epayg-payment-gateway' ) );
 
     if ( empty( $response['body'] ) )
-      throw new Exception( __( 'La respuesta esta vacia.', 'bac-payment' ) );
+      throw new Exception( __( 'La respuesta esta vacia.', 'epayg-payment-gateway' ) );
 
     // Si no se encontro ningun error recuperamos la respuesta
     $response_body = wp_remote_retrieve_body( $response );
 
+    foreach ( preg_split( "/\r?\n/", $response_body ) as $line ) {
+      $resp = explode( "|", $line );
+    }
+    // valores obtenidos
+    $r['response_code']             = $resp[0];
+    $r['response_sub_code']         = $resp[1];
+    $r['response_reason_code']      = $resp[2];
+    $r['response_reason_text']      = $resp[3];
+
+    /*
     // Analizamos la respuesta para poder leerla
     $resp_e = explode( "&", $response_body ); //Convertimos el cuerpo de la respuesta en strings quitando el delimitador &
     $resp = array();
     foreach($resp_e as $r) {
       $v = explode('=', $r);//separamos los string de cada iteracion del delimitador =
       $resp[$v[0]] = $v[1];//Almacenamos los datos separados en el arreglo resp
-    }
+    }*/
 
     //Evaluamos la respuesta del codigo enviado para verificar si fue exitoso o no
-    if ( ($resp['response'] == 1 ) || ( $resp['response_code'] == 200 ) ) {
+    if ( ($r['response_code'] == 1 ) || ( $r['response_code'] == 4 ) ) {
       // El pago se completo con exito
-      $customer_order->add_order_note( __( 'Pago completado con exito.', 'epayg_payment' ) );
-
-      // Guardando la informacion
-      $order_id = method_exists( $customer_order, 'get_id' ) ? $customer_order->get_id() : $customer_order->ID;
-      update_post_meta($order_id , '_wc_order_authcode', $resp['authcode'] );
-			update_post_meta($order_id , '_wc_order_transactionid', $resp['transactionid'] );
+      $customer_order->add_order_note( __( 'EpayG: Pago completado con exito!.', 'epayg-payment-gateway' ) );
 
       // Marcamos el pedido como pagado
       $customer_order->payment_complete();
@@ -167,9 +256,9 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
       );
     } else {
       // Si la transaccion no fue exitosa agregamos una notificacion al carrito
-      wc_add_notice( $resp['responsetext'], 'error' );
+      wc_add_notice( $r['response_reason_text'], 'error' );
       // agregamos una nota al pedido referenciado
-      $customer_order->add_order_note( 'Error: '. $resp['responsetext'] );
+      $customer_order->add_order_note( 'Error: '. $r['response_reason_text'] );
     }
 
   }//fin del proceso de pago
@@ -179,14 +268,13 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
     return true; //retornamos verdadero para activar la validacion
   }
 
+  //chequeo del certificado ssl
+  public function do_ssl_check() {
+    if( $this->enabled == "yes" ) {
+      if( get_option( 'woocommerce_force_ssl_checkout' ) == "no" ) {
+        echo "<div class=\"error\"><p>". sprintf( __( "<strong>%s</strong> is enabled and WooCommerce is not forcing the SSL certificate on your checkout page. Please ensure that you have a valid SSL certificate and that you are <a href=\"%s\">forcing the checkout pages to be secured.</a>" ), $this->method_title, admin_url( 'admin.php?page=wc-settings&tab=checkout' ) ) ."</p></div>";
+      }
+    }
+  }
 }
-
-//Mostramos el valor del campo en la página de edición del pedido
-add_action( 'woocommerce_admin_order_data_after_billing_address', 'show_info', 10, 1 );
-function show_info( $order ){
-    $order_id = method_exists( $order, 'get_id' ) ? $order->get_id() : $order->id;
-    echo '<p><strong>'.__('Auth Code').':</strong> ' . get_post_meta( $order_id, '_wc_order_authcode', true ) . '</p>';
-    echo '<p><strong>'.__('Transaction Id').':</strong> ' . get_post_meta( $order_id, '_wc_order_transactionid', true ) . '</p>';
-}
-
 ?>
