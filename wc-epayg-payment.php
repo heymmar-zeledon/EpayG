@@ -187,6 +187,7 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
     /*
     $orderid = str_replace( "#", "", $customer_order->get_order_number() );
 
+    //construccion del hash de entrada
     $hash = md5($orderid."|".$customer_order->order_total."|".$time."|".$this->api_key);
 
     // Preparamos la informacion a enviar
@@ -206,11 +207,14 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
     // Enviamos esta autorizacion para el procesamiento
     $response = wp_remote_post( $environment_url, array(
       'method'    => 'POST',
+      //http buils query lo utilizamos para crear una consulta de tipo http de modo que usara el hash de entrada y contruira una url respectiva
+      //Ejemplo de construccion: foo=bar&x=1&...n campos del hash
       'body'      => http_build_query( $payload ),
       'timeout'   => 90,
       'sslverify' => false,
     ) );
 
+    //verificamos la respuesta obtenida si tiene algun error
     if ( is_wp_error( $response ) )
       throw new Exception( __( 'Ups! Tenemos un pequeño inconveniente con este pago, sentimos las molestias.', 'epayg-payment-gateway' ) );
 
@@ -261,7 +265,7 @@ class EpayG_Payment_Gateway extends WC_Payment_Gateway {
       $customer_order->add_order_note( 'Error: '. $r['response_reason_text'] );
     }
 
-  }//fin del proceso de pago
+  } //fin del proceso de pago
 
   //funcion para validar los campos
   public function validate_fields() {
